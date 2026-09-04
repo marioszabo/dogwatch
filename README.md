@@ -1,21 +1,21 @@
 # Dogwatch
 
-Dogwatch is a **local-only, experimental** macOS bark-event monitor. It classifies in-memory microphone blocks with Google's YAMNet, groups adjacent high-confidence frames into physical bark events, and can play a user-chosen response after a configurable number of events during quiet hours. It is not a sound-level meter, safety device, veterinary tool, or substitute for humane training. Never use audio that frightens or harms an animal.
+Dogwatch is a **local-only, experimental** macOS bark-event monitor. By default, its dashboard runs the same browser TensorFlow.js YAMNet detector used by dogbarkingdetector.com, then sends local detections to Python for bark counting, quiet-hours checks, cooldown, and response playback. It is not a sound-level meter, safety device, veterinary tool, or substitute for humane training. Never use audio that frightens or harms an animal.
 
 ## Requirements and exact installation
 
-Designed for a Mac with Apple Silicon (M2 tested target), macOS 13+, Python 3.11, Xcode command-line tools, and PortAudio. Install PortAudio and create an isolated environment:
+Designed for a Mac with Apple Silicon (M2 tested target), macOS 13+, Python 3.12, Xcode command-line tools, and PortAudio. Install PortAudio and create an isolated environment:
 
 ```bash
 brew install portaudio
 cd /path/to/dogwatch
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-The pinned TensorFlow 2.16 runtime publishes native macOS arm64 wheels and avoids needing a custom model conversion. `tensorflow_hub` acquires `https://tfhub.dev/google/yamnet/1` on first use and caches it (normally below `$TMPDIR/tfhub_modules`, configurable with `TFHUB_CACHE_DIR`). The official 521-class AudioSet map is read from the model asset when available, with the official TensorFlow Models map as fallback. **First-time model/map acquisition can require network access**; later runs use the local cache. Dog labels are selected by class name, not a magic index.
+The default runtime serves a local copy of the TensorFlow.js YAMNet model and WASM backend from `web/model` and `web/libs`; microphone audio is processed in the browser at `127.0.0.1` and is not uploaded. The optional `inference_runtime: "python"` path keeps the earlier Python TensorFlow Hub implementation for WAV validation and experimentation, but the normal live detector uses the browser runtime because it matched the working dogbarkingdetector.com behavior in testing.
 
 ## macOS microphone permission
 
@@ -33,7 +33,7 @@ python app.py                 # normal structured JSON logs
 python app.py --debug         # verbose structured JSON logs
 ```
 
-Open <http://127.0.0.1:8765>. It is intentionally bound only to loopback. The dashboard reports state, event count, bark confidence, and digital level; edits are schema/range validated before an atomic save. **Simulate Bark** and **Simulate 5 Barks** use the exact finalized-event/state-machine route used by real barks. **Test Response** uses actual playback and the complete suppression lifecycle. Ctrl-C/SIGTERM gracefully stops HTTP and microphone capture.
+Open <http://127.0.0.1:8765>. It is intentionally bound only to loopback. Click **Start Browser Detector** and allow microphone access in the browser if prompted. The dashboard reports state, event count, YAMNet confidence, and the dog-related class scores used by the detector. **Simulate Bark** and **Simulate 5 Barks** use the same local state-machine route as real detections. **Test Response** uses actual playback and the complete suppression lifecycle. Ctrl-C/SIGTERM gracefully stops HTTP and microphone capture.
 
 ## Configuration
 
@@ -42,8 +42,9 @@ Open <http://127.0.0.1:8765>. It is intentionally bound only to loopback. The da
 | Key | Meaning |
 |---|---|
 | `enabled` | Master detection switch |
+| `inference_runtime` | `browser` for the local TFJS detector, `python` for the older Python TensorFlow path |
 | `quiet_start`, `quiet_end` | Local `HH:MM`; supports midnight crossing; equal means all day |
-| `bark_on_threshold`, `bark_off_threshold` | YAMNet onset/release hysteresis; off must be lower |
+| `bark_on_threshold`, `bark_off_threshold` | Detection sensitivity; off must be lower for the Python event segmenter |
 | `min_event_duration_s` | Discard shorter high-confidence spikes |
 | `release_duration_s` | Low confidence must persist this long before finalization |
 | `min_event_gap_s` | Minimum separation after a finalized event |
@@ -51,6 +52,8 @@ Open <http://127.0.0.1:8765>. It is intentionally bound only to loopback. The da
 | `post_playback_suppression_s`, `cooldown_s` | Continued input rejection after playback |
 | `response_path` | Local response audio |
 | `rms_gate_dbfs` | Optional digital energy gate; `null` disables it |
+| `dog_specific_floor` | Minimum score for a specific dog class before generic animal scores can count |
+| `website_detection_debounce_s` | Minimum seconds between browser-style YAMNet detections |
 
 Unknown keys, wrong types, non-finite/out-of-range values, invalid times, unsafe relative paths, and malformed JSON are rejected with explicit messages. Applying configuration clears stale event-count and segmentation state.
 

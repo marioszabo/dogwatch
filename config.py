@@ -22,6 +22,7 @@ def _num(name: str, value: Any, low: float, high: float) -> float:
 @dataclass(frozen=True)
 class Config:
     enabled: bool = True
+    inference_runtime: str = "browser"
     quiet_start: str = "22:30"
     quiet_end: str = "07:00"
     bark_on_threshold: float = .45
@@ -35,15 +36,26 @@ class Config:
     cooldown_s: float = 60.0
     response_path: str = "sounds/response.wav"
     rms_gate_dbfs: float | None = -55.0
+    acoustic_detector_enabled: bool = True
+    yamnet_peak_normalize: bool = True
+    yamnet_peak_normalize_min_dbfs: float = -65.0
+    dog_specific_floor: float = 0.01
+    website_detection_debounce_s: float = 4.0
 
     def validate(self, base_dir: Path | None = None) -> "Config":
         if type(self.enabled) is not bool: raise ConfigError("enabled must be a boolean")
+        if self.inference_runtime not in ("browser","python"): raise ConfigError("inference_runtime must be 'browser' or 'python'")
+        if type(self.acoustic_detector_enabled) is not bool: raise ConfigError("acoustic_detector_enabled must be a boolean")
+        if type(self.yamnet_peak_normalize) is not bool: raise ConfigError("yamnet_peak_normalize must be a boolean")
         _time(self.quiet_start); _time(self.quiet_end)
         on=_num("bark_on_threshold",self.bark_on_threshold,0,1); off=_num("bark_off_threshold",self.bark_off_threshold,0,1)
         if off >= on: raise ConfigError("bark_off_threshold must be lower than bark_on_threshold")
         for n,lo,hi in [("min_event_duration_s",.01,30),("release_duration_s",.01,30),("min_event_gap_s",0,300),("rolling_window_s",.1,3600),("post_playback_suppression_s",0,300),("cooldown_s",0,86400)]: _num(n,getattr(self,n),lo,hi)
         if type(self.required_barks) is not int or not 1 <= self.required_barks <= 100: raise ConfigError("required_barks must be an integer between 1 and 100")
         if self.rms_gate_dbfs is not None: _num("rms_gate_dbfs",self.rms_gate_dbfs,-160,0)
+        _num("yamnet_peak_normalize_min_dbfs",self.yamnet_peak_normalize_min_dbfs,-160,0)
+        _num("dog_specific_floor",self.dog_specific_floor,0,1)
+        _num("website_detection_debounce_s",self.website_detection_debounce_s,0,300)
         if not isinstance(self.response_path,str) or not self.response_path.strip(): raise ConfigError("response_path must be a non-empty path")
         path=Path(self.response_path).expanduser()
         if "\x00" in self.response_path: raise ConfigError("response_path contains an invalid NUL byte")

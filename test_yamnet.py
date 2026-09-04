@@ -15,7 +15,13 @@ def main(argv=None):
   for pos in range(0,len(audio),step):
    chunk=audio[pos:pos+step]
    if not len(chunk):continue
-   r=model.classify(chunk); print(f"{pos/16000:7.2f}s bark={r.bark_score:.4f}  "+", ".join(f"{x.label}={x.score:.3f}" for x in r.top_predictions))
+   r=model.classify(chunk)
+   dog_scores=[]
+   if len(r.frame_scores):
+    peak=r.frame_scores.max(axis=0)
+    dog_scores=[f"{model.labels[i]}={float(peak[i]):.3f}" for i in model.dog_indices if float(peak[i])>=.01]
+   print(f"{pos/16000:7.2f}s dog_bark={r.bark_score:.4f}  "+", ".join(f"{x.label}={x.score:.3f}" for x in r.top_predictions))
+   if dog_scores: print(" "*10+"dog labels: "+", ".join(dog_scores))
   print("latency:",model.latency_stats());return 0
  except FileNotFoundError:print(f"error: WAV not found: {a.wav}",file=sys.stderr)
  except (ValueError,OSError) as exc:print(f"error: unsupported or corrupt WAV: {exc}",file=sys.stderr)
