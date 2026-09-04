@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "quiet_start": "22:30",
+  "quiet_end": "07:00",
+  "bark_on_threshold": 0.45,
+  "bark_off_threshold": 0.25,
+  "min_event_duration_s": 0.2,
+  "release_duration_s": 0.35,
+  "min_event_gap_s": 0.5,
+  "rolling_window_s": 30.0,
+  "required_barks": 5,
+  "post_playback_suppression_s": 1.0,
+  "cooldown_s": 60.0,
+  "response_path": "sounds/response.wav",
+  "rms_gate_dbfs": -55.0
+}
