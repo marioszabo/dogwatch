@@ -1,0 +1,5 @@
+# Response audio is user-supplied or generated locally; do not commit recordings.
+*.wav
+*.wave
+*.aif
+*.aiff

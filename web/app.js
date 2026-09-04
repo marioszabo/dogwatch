@@ -1,0 +1,8 @@
+const form=document.querySelector('#config'), msg=document.querySelector('#message'); let cfg={};
+async function json(url,options){const r=await fetch(url,options);const data=await r.json();if(!r.ok)throw Error(data.detail||r.statusText);return data}
+function render(c){cfg=c;form.innerHTML='';for(const [k,v] of Object.entries(c)){const label=document.createElement('label');label.textContent=k;const input=document.createElement('input');input.name=k;if(typeof v==='boolean'){input.type='checkbox';input.checked=v}else{input.value=v??'';input.dataset.type=typeof v}label.append(input);form.append(label)}}
+async function status(){try{const s=await json('/api/status');document.querySelector('#status').textContent=`${s.state} · ${s.bark_count} barks · confidence ${s.last_bark_score.toFixed(3)} · ${s.last_dbfs.toFixed(1)} dBFS`}catch(e){msg.textContent=e.message}}
+document.querySelectorAll('[data-count]').forEach(b=>b.onclick=()=>json('/api/simulate/'+b.dataset.count,{method:'POST'}).then(status).catch(e=>msg.textContent=e.message));
+document.querySelector('#test').onclick=()=>json('/api/test-response',{method:'POST'}).then(status).catch(e=>msg.textContent=e.message);
+document.querySelector('#save').onclick=async()=>{const out={};for(const el of form.elements){out[el.name]=el.type==='checkbox'?el.checked:el.value===''?null:el.dataset.type==='number'?Number(el.value):el.value}try{render(await json('/api/config',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(out)}));msg.textContent='Saved.'}catch(e){msg.textContent='Not saved: '+e.message}};
+json('/api/config').then(render);status();setInterval(status,1000);
