@@ -11,6 +11,7 @@ class ClassificationResult:
     frame_scores: np.ndarray
     embeddings: np.ndarray
     latency_ms: float
+    dog_scores: dict[str,float] | None = None
 class AudioClassifier(ABC):
     sample_rate=16000
     @abstractmethod

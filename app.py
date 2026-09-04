@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,logging,signal,sys,threading,time
+import argparse,json,logging,signal,sys,threading,time,warnings
 from pathlib import Path
 from config import ConfigError,load_config
 
@@ -19,6 +19,7 @@ def validate_startup(config):
  if not p.is_file():raise ConfigError(f"response file not found: {p}; see sounds/README.md")
 def main(argv=None):
  parser=argparse.ArgumentParser(description="Local YAMNet dog-bark monitor");parser.add_argument("--config",default="config.json");m=parser.add_mutually_exclusive_group();m.add_argument("--calibrate",action="store_true");m.add_argument("--debug",action="store_true");args=parser.parse_args(argv);logging_setup(args.debug)
+ warnings.filterwarnings("ignore",message="pkg_resources is deprecated as an API.*",category=UserWarning,module="tensorflow_hub")
  try:cfg=load_config(args.config);validate_startup(cfg)
  except ConfigError as exc:logging.error("startup_validation_failed",extra={"detail":str(exc)});return 2
  try:
@@ -33,19 +34,29 @@ def main(argv=None):
    except KeyboardInterrupt:pass
    finally:cap.stop()
    return 0
-  from ml.yamnet_classifier import YAMNetClassifier
   from audio.playback import MacOSAudioPlayer
   from service import DogwatchService
-  classifier=YAMNetClassifier();service=DogwatchService(cfg,classifier,MacOSAudioPlayer());capture=AudioCapture();capture.start();stop=threading.Event()
+  capture=None;worker=None;stop=threading.Event()
+  if cfg.inference_runtime=="python":
+   from ml.yamnet_classifier import YAMNetClassifier
+   classifier=YAMNetClassifier();capture=AudioCapture();capture.start()
+  else:
+   logging.info("browser_yamnet_runtime_enabled")
+   classifier=None
+  service=DogwatchService(cfg,classifier,MacOSAudioPlayer())
   def consume():
    while not stop.is_set():
     block=capture.read(.5)
     if block is not None:service.process_audio(block,capture.sample_rate)
-  worker=threading.Thread(target=consume,name="audio",daemon=True);worker.start()
+  if capture:
+   worker=threading.Thread(target=consume,name="audio",daemon=True);worker.start()
   import uvicorn
   from web.server import create_app
   server=uvicorn.Server(uvicorn.Config(create_app(service,args.config),host="127.0.0.1",port=8765,log_config=None))
   def shutdown(*_):logging.info("shutdown_requested");stop.set();server.should_exit=True
-  signal.signal(signal.SIGINT,shutdown);signal.signal(signal.SIGTERM,shutdown);server.run();stop.set();capture.stop();worker.join(2);return 0
+  signal.signal(signal.SIGINT,shutdown);signal.signal(signal.SIGTERM,shutdown);server.run();stop.set()
+  if capture:capture.stop()
+  if worker:worker.join(2)
+  return 0
  except Exception:logging.exception("fatal_startup_or_runtime_error");return 1
 if __name__=="__main__":raise SystemExit(main())

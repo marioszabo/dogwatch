@@ -24,6 +24,15 @@ def rms_dbfs(audio: np.ndarray) -> tuple[float,float]:
     x=to_mono_float32(audio); rms=float(np.sqrt(np.mean(np.square(x,dtype=np.float64)))) if x.size else 0.0
     return rms, (20*np.log10(rms) if rms>0 else float("-inf"))
 
+def dc_removed_peak_normalized(audio: np.ndarray, min_dbfs: float=-65.0) -> np.ndarray:
+    x=to_mono_float32(audio)
+    _,db=rms_dbfs(x)
+    if db < min_dbfs:return x
+    x=x-float(np.mean(x,dtype=np.float64))
+    peak=float(np.max(np.abs(x))) if x.size else 0.0
+    if peak <= 1e-6:return x.astype(np.float32)
+    return (x/peak).clip(-1,1).astype(np.float32)
+
 def prepare_audio(audio: np.ndarray, source_rate: int, gate_dbfs: float|None=None) -> tuple[np.ndarray,float,bool]:
     x=resample_audio(audio,source_rate); _,db=rms_dbfs(x); gated=gate_dbfs is not None and db < gate_dbfs
     return (np.zeros_like(x) if gated else x),db,gated
