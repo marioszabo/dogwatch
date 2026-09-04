@@ -1,1 +1,80 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Dogwatch</title><link rel="stylesheet" href="/static/style.css"></head><body><main><h1>Dogwatch</h1><p class="privacy">Local-only bark monitoring; audio stays in memory.</p><section><h2>Live status</h2><div id="status">Connecting...</div><div id="browser-detector">Browser YAMNet: stopped</div><button id="browser-start">Start Browser Detector</button><button id="browser-stop" disabled>Stop Browser Detector</button><h3>Top classes</h3><ol id="top"></ol><h3>Dog detector classes</h3><ol id="dog-scores"></ol><button data-count="1">Simulate Bark</button><button data-count="5">Simulate 5 Barks</button><button id="test">Test Response</button></section><section><h2>Configuration</h2><form id="config"></form><button id="save">Save validated configuration</button><p id="message"></p></section></main><script src="/static/libs/tf.min.js"></script><script src="/static/libs/tf-backend-wasm.js"></script><script src="/static/libs/yamnet.js"></script><script src="/static/browser-detector.js"></script><script src="/static/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dogwatch</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <div class="brand-mark" aria-hidden="true">
+        <span class="ear left"></span>
+        <span class="ear right"></span>
+        <span class="face">
+          <span class="eye left"></span>
+          <span class="eye right"></span>
+          <span class="nose"></span>
+        </span>
+      </div>
+      <div>
+        <p class="kicker">Local bark monitor</p>
+        <h1>Dogwatch</h1>
+        <p class="privacy">Audio stays on this Mac.</p>
+      </div>
+    </header>
+
+    <section class="panel monitor-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="kicker">Overnight patrol</p>
+          <h2>Monitor</h2>
+        </div>
+        <div id="state-pill" class="state-pill">Starting</div>
+      </div>
+
+      <div class="status-grid">
+        <div class="status-card">
+          <span>Barks</span>
+          <strong id="bark-count">0 / 5</strong>
+        </div>
+        <div class="status-card">
+          <span>Quiet Hours</span>
+          <strong id="quiet-state">Inactive</strong>
+        </div>
+        <div class="status-card">
+          <span>Sound Level</span>
+          <strong id="audio-level">Waiting</strong>
+        </div>
+      </div>
+
+      <div id="browser-detector" class="detector-line">Browser YAMNet: stopped</div>
+
+      <div class="actions">
+        <button id="browser-start" class="primary">Start Listening</button>
+        <button id="browser-stop" disabled>Stop Listening</button>
+        <button id="test">Test Response</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="kicker">Tuning</p>
+          <h2>Configuration</h2>
+        </div>
+        <button id="save" class="save-button">Save</button>
+      </div>
+      <form id="config" class="config-form"></form>
+      <p id="message" role="status"></p>
+    </section>
+  </main>
+
+  <script src="/static/libs/tf.min.js"></script>
+  <script src="/static/libs/tf-backend-wasm.js"></script>
+  <script src="/static/libs/yamnet.js"></script>
+  <script src="/static/browser-detector.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
