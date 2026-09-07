@@ -23,8 +23,8 @@ def main(argv=None):
  try:cfg=load_config(args.config);validate_startup(cfg)
  except ConfigError as exc:logging.error("startup_validation_failed",extra={"detail":str(exc)});return 2
  try:
-  from audio.capture import AudioCapture
   if args.calibrate:
+   from audio.capture import AudioCapture
    from audio.processing import rms_dbfs
    cap=AudioCapture();cap.start();logging.info("calibration_started (Ctrl-C to stop; values are dBFS, not SPL)")
    try:
@@ -38,6 +38,7 @@ def main(argv=None):
   from service import DogwatchService
   capture=None;worker=None;stop=threading.Event()
   if cfg.inference_runtime=="python":
+   from audio.capture import AudioCapture
    from ml.yamnet_classifier import YAMNetClassifier
    classifier=YAMNetClassifier();capture=AudioCapture();capture.start()
   else:
@@ -50,11 +51,12 @@ def main(argv=None):
     if block is not None:service.process_audio(block,capture.sample_rate)
   if capture:
    worker=threading.Thread(target=consume,name="audio",daemon=True);worker.start()
-  import uvicorn
-  from web.server import create_app
-  server=uvicorn.Server(uvicorn.Config(create_app(service,args.config),host="127.0.0.1",port=8765,log_config=None))
-  def shutdown(*_):logging.info("shutdown_requested");stop.set();server.should_exit=True
-  signal.signal(signal.SIGINT,shutdown);signal.signal(signal.SIGTERM,shutdown);server.run();stop.set()
+  from web.simple_server import serve
+  def shutdown(*_):logging.info("shutdown_requested");stop.set();raise KeyboardInterrupt
+  signal.signal(signal.SIGINT,shutdown);signal.signal(signal.SIGTERM,shutdown)
+  try:serve(service,args.config)
+  except KeyboardInterrupt:pass
+  stop.set()
   if capture:capture.stop()
   if worker:worker.join(2)
   return 0

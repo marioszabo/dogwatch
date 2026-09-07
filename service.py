@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime
 import logging,math,threading,time
-import numpy as np
 from detection.bark_counter import BarkCounter
-from detection.acoustic_bark import acoustic_bark_score
 from detection.bark_event import BarkEventSegmenter
 from scheduler import is_quiet_time
 from state import StateMachine,State
@@ -13,15 +11,17 @@ WINDOW_SIZE=15360
 HOP_SIZE=7680
 class DogwatchService:
  def __init__(self,config,classifier,player,clock=time.monotonic):
-  self.config=config; self.classifier=classifier; self.player=player; self.clock=clock; self.state=StateMachine(config.enabled,clock); self._build_detection(); self.last_score=0.; self.last_model_score=0.; self.last_acoustic_score=0.; self.last_dbfs=float("-inf"); self.last_gated=False; self.last_top_predictions=[]; self.last_dog_scores={}; self._play_thread=None; self._wave_buffer=np.zeros(0,dtype=np.float32); self._prediction_buffer=[]; self._last_website_event=None
+  self.config=config; self.classifier=classifier; self.player=player; self.clock=clock; self.state=StateMachine(config.enabled,clock); self._build_detection(); self.last_score=0.; self.last_model_score=0.; self.last_acoustic_score=0.; self.last_dbfs=float("-inf"); self.last_gated=False; self.last_top_predictions=[]; self.last_dog_scores={}; self._play_thread=None; self._wave_buffer=None; self._prediction_buffer=[]; self._last_website_event=None
  def _build_detection(self):
   c=self.config; self.segmenter=BarkEventSegmenter(c.bark_on_threshold,c.bark_off_threshold,c.min_event_duration_s,c.release_duration_s,c.min_event_gap_s); self.counter=BarkCounter(c.rolling_window_s,c.required_barks)
- def update_config(self,config): self.config=config; self.state.set_enabled(config.enabled); self._build_detection(); self._wave_buffer=np.zeros(0,dtype=np.float32); self._prediction_buffer=[]; self._last_website_event=None
+ def update_config(self,config): self.config=config; self.state.set_enabled(config.enabled); self._build_detection(); self._wave_buffer=None; self._prediction_buffer=[]; self._last_website_event=None
  def process_audio(self,audio,rate,timestamp=None):
   from audio.processing import dc_removed_peak_normalized,prepare_audio
+  import numpy as np
   if not self.state.accepts_bark():return
   wave,db,gated=prepare_audio(audio,rate,self.config.rms_gate_dbfs); self.last_dbfs=db; self.last_gated=gated
   if gated:return
+  if self._wave_buffer is None:self._wave_buffer=np.zeros(0,dtype=np.float32)
   self._wave_buffer=np.concatenate((self._wave_buffer,wave.astype(np.float32,copy=False)))
   while self._wave_buffer.size>=WINDOW_SIZE:
    window=self._wave_buffer[:WINDOW_SIZE].copy()
@@ -32,6 +32,8 @@ class DogwatchService:
     self._handle_prediction_pair(window,timestamp)
     self._prediction_buffer=[]
  def _handle_prediction_pair(self,window,timestamp=None):
+  import numpy as np
+  from detection.acoustic_bark import acoustic_bark_score
   results=self._prediction_buffer[-2:]
   dog_scores={}
   for result in results:
