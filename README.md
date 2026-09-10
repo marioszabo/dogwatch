@@ -84,8 +84,4 @@ sounds/response.wav
 
 Sample recording tools exist for local testing, but recording is explicit and manual.
 
-## Current Shape
 
-This is still an MVP. It is meant to be easy to tune after trying it with real barking in the actual room.
-
-The detection stack is intentionally modular so it can change later. The browser YAMNet detector works now because it matched the website that successfully detected the phone-played dog barks. If that is not good enough with Boci in the room, the next step would be collecting a few local bark and non-bark samples and adding a small local classifier on top.
