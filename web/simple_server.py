@@ -9,8 +9,10 @@ from urllib.parse import unquote
 
 from config import Config, ConfigError, save_config
 
+MAX_BODY_BYTES = 64 * 1024
 
-def serve(service, config_path="config.json", host="127.0.0.1", port=8765):
+
+def make_server(service, config_path="config.json", host="127.0.0.1", port=8765):
     root = Path(__file__).parent
 
     class Handler(BaseHTTPRequestHandler):
@@ -18,6 +20,24 @@ def serve(service, config_path="config.json", host="127.0.0.1", port=8765):
 
         def log_message(self, fmt, *args):
             return
+
+        def parse_request(self):
+            if not super().parse_request():
+                return False
+            if not self._from_dashboard():
+                self._empty(403)
+                return False
+            return True
+
+        def _from_dashboard(self):
+            # Binding to 127.0.0.1 keeps the network out, but not websites open in a local
+            # browser: a foreign Host means DNS rebinding, a foreign Origin means CSRF.
+            port = self.server.server_address[1]
+            hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            origin = self.headers.get("origin")
+            return self.headers.get("host", "").lower() in hosts and (
+                origin is None or origin.lower() in {f"http://{h}" for h in hosts}
+            )
 
         def _json(self, status, payload):
             body = json.dumps(payload).encode("utf-8")
@@ -33,7 +53,12 @@ def serve(service, config_path="config.json", host="127.0.0.1", port=8765):
             self.end_headers()
 
         def _read_json(self):
-            length = int(self.headers.get("content-length", "0") or "0")
+            try:
+                length = int(self.headers.get("content-length", "0") or "0")
+            except ValueError as exc:
+                raise ConfigError("invalid content-length") from exc
+            if not 0 <= length <= MAX_BODY_BYTES:
+                raise ConfigError("request body too large")
             if length == 0:
                 return {}
             try:
@@ -134,7 +159,11 @@ def serve(service, config_path="config.json", host="127.0.0.1", port=8765):
                 return
             self._empty(404)
 
-    httpd = ThreadingHTTPServer((host, port), Handler)
+    return ThreadingHTTPServer((host, port), Handler)
+
+
+def serve(service, config_path="config.json", host="127.0.0.1", port=8765):
+    httpd = make_server(service, config_path, host, port)
     try:
         httpd.serve_forever()
     finally:
